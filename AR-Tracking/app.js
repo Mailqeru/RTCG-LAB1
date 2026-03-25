@@ -5,10 +5,15 @@ let markerGenerated = false;
 
 // Upload Image Button
 function uploadImage() {
-    // Reset tracking data if exists
-    if (typeof resetTrackingData === 'function') {
-        resetTrackingData();
+    if (!window.trackingDataList) {
+        window.trackingDataList = [];
     }
+
+    if (window.trackingDataList.length >= 3) {
+        updateStatus("⚠️ Max 3 markers only! Cannot upload more.");
+        return; // stop uploading if already 3 markers
+    }
+
     document.getElementById('fileInput').click();
 }
 
@@ -117,3 +122,43 @@ setInterval(function() {
         updateStatus("✅ OpenCV.js loaded ready!");
     }
 }, 500);
+
+function renderMarkerList() {
+    const container = document.getElementById("markerContainer");
+    container.innerHTML = "";
+
+    if (!window.trackingDataList) return;
+
+    const names = ["Cube", "Sphere", "Pyramid"];
+
+    window.trackingDataList.forEach((marker, index) => {
+        const div = document.createElement("div");
+
+        div.style.border = "2px solid #ccc";
+        div.style.padding = "10px";
+        div.style.borderRadius = "8px";
+        div.style.textAlign = "center";
+
+        div.innerHTML = `
+            <img src="${marker.image}" width="120"><br>
+            <b>${names[marker.type - 1]}</b><br>
+            <button onclick="removeMarker(${index})">❌</button>
+        `;
+
+        container.appendChild(div);
+    });
+}
+
+function removeMarker(index) {
+    if (!window.trackingDataList) return;
+
+    window.trackingDataList.splice(index, 1);
+
+    // Reassign types again
+    window.trackingDataList.forEach((m, i) => {
+        m.type = i + 1;
+    });
+
+    renderMarkerList();
+    updateStatus("🗑️ Marker removed");
+}

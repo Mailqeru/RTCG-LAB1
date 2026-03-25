@@ -67,13 +67,39 @@ function extractFeatures(imageDataUrl, callback) {
         // color.delete(); // Scalar doesn't need delete
         
         // Store feature data globally for AR tracking
-        window.trackingData = {
-            keypoints: keypoints,
-            descriptors: descriptors,
-            markerImage: dst
-        };
-        
-        callback(true, canvas);
+        // Ensure tracking list exists
+if (!window.trackingDataList) {
+    window.trackingDataList = [];
+}
+
+// Limit to 3 markers
+if (window.trackingDataList.length >= 3) {
+    updateStatus("⚠️ Max 3 markers only!");
+    return callback(true, canvas);
+}
+
+const type = window.trackingDataList.length + 1;
+
+// Save marker properly
+const marker = {
+    keypoints: keypoints,
+    descriptors: descriptors.clone(),
+    type: type,
+    image: canvas.toDataURL(),
+    imageWidth: canvas.width,
+    imageHeight: canvas.height
+};
+
+window.trackingDataList.push(marker);
+
+// Update marker UI
+renderMarkerList();
+
+// Enable AR button
+document.getElementById('arBtn').disabled = false;
+
+updateStatus(`✅ Marker ${type} saved`);
+callback(true, canvas);
         
     } catch (error) {
         console.error("❌ Feature extraction error:", error.name, error.message);
@@ -102,6 +128,7 @@ function safeCleanup() {
 // Helper: Reset tracking data when uploading new image
 function resetTrackingData() {
     safeCleanup();
-    window.trackingData = null;
+    window.trackingDataList = [];
+    renderMarkerList();
     console.log("🔄 Tracking data reset");
 }

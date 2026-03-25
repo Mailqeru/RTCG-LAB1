@@ -188,15 +188,9 @@ function animateAR() {
 
 // REAL MARKER DETECTION using OpenCV.js
 function detectMarker() {
-    if (!videoElement || videoElement.readyState !== videoElement.HAVE_ENOUGH_DATA) {
-        return;
-    }
-    
-    // Check if we have saved marker features
-    if (!window.trackingData || !window.trackingData.descriptors) {
-        return;
-    }
-    
+    if (!videoElement || videoElement.readyState !== videoElement.HAVE_ENOUGH_DATA) return;
+    if (!window.trackingDataList || window.trackingDataList.length === 0) return;
+
     try {
         // Capture current video frame
         const canvas = document.createElement('canvas');
@@ -204,81 +198,103 @@ function detectMarker() {
         canvas.height = videoElement.videoHeight;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(videoElement, 0, 0);
-        
-        // Convert to OpenCV Mat
+
         const frame = cv.imread(canvas);
         const frameGray = new cv.Mat();
         cv.cvtColor(frame, frameGray, cv.COLOR_RGBA2GRAY, 0);
-        
+
         // Extract features from current frame
         const orb = new cv.ORB();
         const frameKeypoints = new cv.KeyPointVector();
         const frameDescriptors = new cv.Mat();
-        
         const mask = new cv.Mat();
         orb.detectAndCompute(frameGray, mask, frameKeypoints, frameDescriptors);
         mask.delete();
-        
-        const savedDescriptors = window.trackingData.descriptors;
-        
-        if (savedDescriptors && savedDescriptors.rows > 0 && frameDescriptors.rows > 0) {
-            // Use KNN matcher for better quality
+
+        // Loop through saved markers
+        let detected = false;
+        for (let marker of window.trackingDataList) {
+            if (marker.descriptors.rows === 0 || frameDescriptors.rows === 0) continue;
+
             const matcher = new cv.BFMatcher(cv.NORM_HAMMING, false);
             const matches = new cv.DMatchVectorVector();
-            
-            // KNN match with k=2
-            matcher.knnMatch(savedDescriptors, frameDescriptors, matches, 2);
-            
-            // Apply Lowe's ratio test for quality filtering
-            let goodMatches = 0;
-            const ratioThreshold = 0.75;
-            
+            matcher.knnMatch(marker.descriptors, frameDescriptors, matches, 2);
+
+            // Lowe's ratio test
+            let goodMatches = [];
             for (let i = 0; i < matches.size(); i++) {
-                const matchVec = matches.get(i);
-                if (matchVec.size() >= 2) {
-                    const m1 = matchVec.get(0);
-                    const m2 = matchVec.get(1);
-                    
-                    // Lowe's ratio test
-                    if (m1.distance < ratioThreshold * m2.distance) {
-                        goodMatches++;
+                const m = matches.get(i).get(0);
+                const n = matches.get(i).get(1);
+                if (m.distance < 0.75 * n.distance) goodMatches.push(m);
+            }
+
+            if (goodMatches.length > 30) { // marker detected
+                detected = true;
+
+                // Find marker corners in video frame using homography
+                let srcPts = [];
+                let dstPts = [];
+                for (let m of goodMatches) {
+                    const kp = marker.keypoints.get(m.queryIdx).pt;
+                    srcPts.push(kp.x, kp.y);
+
+                    const fp = frameKeypoints.get(m.trainIdx).pt;
+                    dstPts.push(fp.x, fp.y);
+                }
+
+                if (srcPts.length >= 4) {
+                    const srcMat = cv.matFromArray(srcPts.length / 2, 1, cv.CV_32FC2, srcPts);
+                    const dstMat = cv.matFromArray(dstPts.length / 2, 1, cv.CV_32FC2, dstPts);
+                    const H = cv.findHomography(srcMat, dstMat, cv.RANSAC);
+
+                    if (!H.empty()) {
+                        // Compute center of marker in video frame
+                        let corners = cv.matFromArray(4, 1, cv.CV_32FC2, [
+                            0, 0,
+                            marker.imageWidth, 0,
+                            marker.imageWidth, marker.imageHeight,
+                            0, marker.imageHeight
+                        ]);
+                        let transformedCorners = new cv.Mat();
+                        cv.perspectiveTransform(corners, transformedCorners, H);
+
+                        // Compute center
+                        const data = transformedCorners.data32F;
+                        const centerX = (data[0] + data[2] + data[4] + data[6]) / 4;
+                        const centerY = (data[1] + data[3] + data[5] + data[7]) / 4;
+
+                        // Map video coords to Three.js coords
+                        const x = (centerX / videoElement.videoWidth - 0.5) * 16; // match your plane size
+                        const y = -(centerY / videoElement.videoHeight - 0.5) * 12;
+
+                        arObject.position.set(x, y, 0);
+                        arObject.visible = true;
+
+                        transformedCorners.delete();
+                        corners.delete();
+                        H.delete();
                     }
+
+                    srcMat.delete();
+                    dstMat.delete();
                 }
             }
-            
-            console.log("🔍 Good matches:", goodMatches);
-            
-            // Check if enough GOOD matches
-            if (goodMatches >= MARKER_MATCH_THRESHOLD) {
-                if (!markerDetected) {
-                    console.log("✅ MARKER DETECTED! Matches:", goodMatches);
-                    updateStatus("🎯 Marker detected! 3D object visible");
-                }
-                markerDetected = true;
-                if (arObject) arObject.visible = true;
-            } else {
-                if (markerDetected) {
-                    console.log("❌ Marker lost. Matches:", goodMatches);
-                    updateStatus("⏳ Searching for marker...");
-                }
-                markerDetected = false;
-                if (arObject) arObject.visible = false;
-            }
-            
+
             matcher.delete();
             matches.delete();
         }
-        
-        // Cleanup
+
+        if (!detected && arObject) arObject.visible = false;
+
         orb.delete();
         frameKeypoints.delete();
         frameDescriptors.delete();
         frameGray.delete();
         frame.delete();
         canvas.remove();
-        
+
     } catch (error) {
-        // Silent fail - don't break animation loop
+        console.log("Marker detection error:", error);
     }
 }
 
