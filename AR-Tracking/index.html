@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR Feature Tracking - Lab Assessment</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- ✅ Define onOpenCvReady BEFORE OpenCV.js loads -->
+    <script>
+        function onOpenCvReady() {
+            window.cvReady = true;
+            console.log("✅ OpenCV.js is ready!");
+            if (typeof updateStatus !== 'undefined') {
+                updateStatus("✅ OpenCV.js loaded ready!");
+            }
+        }
+    </script>
+    
+    <!-- OpenCV.js -->
+    <script async src="https://docs.opencv.org/4.5.0/opencv.js" onload="onOpenCvReady()"></script>
+    
+    <!-- Three.js for 3D objects -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- AR.js -->
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/three.js/build/ar-threex.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/three.js/build/ar-threex-location.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 AR Feature Tracking System</h1>
+        <p class="subtitle">Lab Assessment - Real-Time Computer Graphics</p>
+        
+        <!-- UI Buttons Section -->
+        <div class="ui-controls">
+            <button id="uploadBtn" onclick="uploadImage()">📤 Upload Image</button>
+            <button id="generateBtn" onclick="generateFeatures()" disabled>⚙️ Generate Features</button>
+            <button id="saveBtn" onclick="saveMarker()" disabled>💾 Save Marker</button>
+            <button id="arBtn" onclick="startAR()" disabled>🎬 Start AR Scene</button>
+        </div>
+        
+        <!-- Image Display Section -->
+        <div class="image-section">
+            <div class="image-box">
+                <h3>Original Image (RGB)</h3>
+                <img id="originalImage" src="" alt="Upload an image">
+            </div>
+            <div class="image-box">
+                <h3>Grayscale + Features</h3>
+                <canvas id="featureCanvas"></canvas>
+            </div>
+        </div>
+        
+        <!-- Status Display -->
+        <div id="statusBox" class="status-box">
+            <p>Status: <span id="statusText">Waiting for image upload...</span></p>
+        </div>
+        
+        <!-- Hidden file input -->
+        <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="handleFileSelect(event)">
+        
+        <!-- AR Video Section (Hidden until AR starts) -->
+        <div id="arSection" style="display:none;">
+            <h3>🎥 AR Live View</h3>
+            <div id="arContainer"></div>
+        </div>
+    </div>
+    
+    <script src="feature-extract.js"></script>
+    <script src="ar-scene.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
