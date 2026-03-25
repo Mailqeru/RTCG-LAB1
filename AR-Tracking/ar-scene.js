@@ -1,7 +1,8 @@
 // AR Scene Module with REAL Marker Detection
+
 let arScene = null;
 let arCamera = null;
-arRenderer = null;
+let arRenderer = null;
 let videoElement = null;
 let videoTexture = null;
 let trackingActive = false;
@@ -9,8 +10,8 @@ let currentObjectType = 1;
 let markerDetected = false;
 let arObject = null;
 
-const objectColors = [0xff0000, 0x00ff00, 0x0000ff];
-const MARKER_MATCH_THRESHOLD = 20; // Minimum matches to consider marker detected
+const objectColors = [0xff0000, 0x00ff00, 0x0000ff]; // Red, Green, Blue
+const MARKER_MATCH_THRESHOLD = 50; // Minimum good matches to detect marker
 
 function initializeARScene() {
     try {
@@ -19,7 +20,7 @@ function initializeARScene() {
         const container = document.getElementById('arContainer');
         container.innerHTML = '';
         
-        // Create webcam video
+        // Create webcam video element
         videoElement = document.createElement('video');
         videoElement.width = 640;
         videoElement.height = 480;
@@ -33,9 +34,11 @@ function initializeARScene() {
             // Create Three.js scene
             arScene = new THREE.Scene();
             
+            // Create camera
             arCamera = new THREE.PerspectiveCamera(75, 640 / 480, 0.1, 1000);
             arCamera.position.z = 5;
             
+            // Create renderer
             arRenderer = new THREE.WebGLRenderer({ alpha: false, antialias: true });
             arRenderer.setSize(640, 480);
             arRenderer.setPixelRatio(window.devicePixelRatio);
@@ -47,10 +50,10 @@ function initializeARScene() {
             // Add lights
             addLights();
             
-            // ✅ Create 3D object but HIDE it initially
+            // Create 3D object but HIDE it initially
             create3DObject(currentObjectType);
             if (arObject) {
-                arObject.visible = false; // ❌ Hidden until marker detected
+                arObject.visible = false;
             }
             
             // Start tracking loop
@@ -61,7 +64,7 @@ function initializeARScene() {
             
         }).catch(error => {
             console.error("❌ Webcam setup failed:", error);
-            updateStatus("❌ Cannot access webcam");
+            updateStatus("❌ Cannot access webcam. Allow camera permissions!");
         });
         
     } catch (error) {
@@ -105,6 +108,7 @@ async function setupWebcam() {
         await new Promise((resolve) => {
             videoElement.onloadedmetadata = () => {
                 videoElement.play();
+                console.log("✅ Webcam ready");
                 resolve();
             };
         });
@@ -136,13 +140,13 @@ function create3DObject(type) {
     const color = objectColors[(type - 1) % objectColors.length];
     
     switch(type) {
-        case 1:
+        case 1: // Cube
             geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
             break;
-        case 2:
+        case 2: // Sphere
             geometry = new THREE.SphereGeometry(0.9, 32, 32);
             break;
-        case 3:
+        case 3: // Pyramid
             geometry = new THREE.ConeGeometry(0.9, 1.5, 4);
             break;
         default:
@@ -154,18 +158,19 @@ function create3DObject(type) {
     arObject.name = 'arObject';
     arObject.position.y = 0.5;
     arObject.position.z = 0;
-    arObject.visible = false; // ✅ Start hidden
+    arObject.visible = false; // Start hidden
     
     arScene.add(arObject);
+    console.log(`✅ 3D Object ${type} created`);
 }
 
-// ✅ MAIN TRACKING LOOP - Detects marker in real-time
+// Main AR animation loop
 function animateAR() {
     if (!trackingActive) return;
     
     requestAnimationFrame(animateAR);
     
-    // ✅ Check if marker is visible
+    // Check if marker is visible
     detectMarker();
     
     // Only rotate if marker is detected
@@ -181,7 +186,7 @@ function animateAR() {
     arRenderer.render(arScene, arCamera);
 }
 
-// ✅ REAL MARKER DETECTION using OpenCV.js
+// REAL MARKER DETECTION using OpenCV.js
 function detectMarker() {
     if (!videoElement || videoElement.readyState !== videoElement.HAVE_ENOUGH_DATA) {
         return;
@@ -193,19 +198,19 @@ function detectMarker() {
     }
     
     try {
-        // Step 1: Capture current video frame
+        // Capture current video frame
         const canvas = document.createElement('canvas');
         canvas.width = videoElement.videoWidth;
         canvas.height = videoElement.videoHeight;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(videoElement, 0, 0);
         
-        // Step 2: Convert to OpenCV Mat
+        // Convert to OpenCV Mat
         const frame = cv.imread(canvas);
         const frameGray = new cv.Mat();
         cv.cvtColor(frame, frameGray, cv.COLOR_RGBA2GRAY, 0);
         
-        // Step 3: Extract features from current frame
+        // Extract features from current frame
         const orb = new cv.ORB();
         const frameKeypoints = new cv.KeyPointVector();
         const frameDescriptors = new cv.Mat();
@@ -214,42 +219,50 @@ function detectMarker() {
         orb.detectAndCompute(frameGray, mask, frameKeypoints, frameDescriptors);
         mask.delete();
         
-        // Step 4: Match with saved marker descriptors
         const savedDescriptors = window.trackingData.descriptors;
         
         if (savedDescriptors && savedDescriptors.rows > 0 && frameDescriptors.rows > 0) {
-            const matcher = new cv.BFMatcher(cv.NORM_HAMMING, true);
-            const matches = new cv.DMatchVector();
+            // Use KNN matcher for better quality
+            const matcher = new cv.BFMatcher(cv.NORM_HAMMING, false);
+            const matches = new cv.DMatchVectorVector();
             
-            // Match current frame features with saved marker
-            matcher.match(savedDescriptors, frameDescriptors, matches);
+            // KNN match with k=2
+            matcher.knnMatch(savedDescriptors, frameDescriptors, matches, 2);
             
-            const matchCount = matches.size();
-            console.log("🔍 Matches found:", matchCount);
+            // Apply Lowe's ratio test for quality filtering
+            let goodMatches = 0;
+            const ratioThreshold = 0.75;
             
-            // Step 5: Check if enough matches → marker detected!
-            if (matchCount >= MARKER_MATCH_THRESHOLD) {
+            for (let i = 0; i < matches.size(); i++) {
+                const matchVec = matches.get(i);
+                if (matchVec.size() >= 2) {
+                    const m1 = matchVec.get(0);
+                    const m2 = matchVec.get(1);
+                    
+                    // Lowe's ratio test
+                    if (m1.distance < ratioThreshold * m2.distance) {
+                        goodMatches++;
+                    }
+                }
+            }
+            
+            console.log("🔍 Good matches:", goodMatches);
+            
+            // Check if enough GOOD matches
+            if (goodMatches >= MARKER_MATCH_THRESHOLD) {
                 if (!markerDetected) {
-                    console.log("✅ MARKER DETECTED!");
+                    console.log("✅ MARKER DETECTED! Matches:", goodMatches);
                     updateStatus("🎯 Marker detected! 3D object visible");
                 }
                 markerDetected = true;
-                
-                // Show 3D object
-                if (arObject) {
-                    arObject.visible = true;
-                }
+                if (arObject) arObject.visible = true;
             } else {
                 if (markerDetected) {
-                    console.log("❌ Marker lost");
+                    console.log("❌ Marker lost. Matches:", goodMatches);
                     updateStatus("⏳ Searching for marker...");
                 }
                 markerDetected = false;
-                
-                // Hide 3D object
-                if (arObject) {
-                    arObject.visible = false;
-                }
+                if (arObject) arObject.visible = false;
             }
             
             matcher.delete();
@@ -266,7 +279,6 @@ function detectMarker() {
         
     } catch (error) {
         // Silent fail - don't break animation loop
-        // console.warn("Detection error:", error);
     }
 }
 

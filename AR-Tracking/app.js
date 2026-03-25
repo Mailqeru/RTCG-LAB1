@@ -1,18 +1,14 @@
 // Global variables
 let originalImageData = null;
 let featureData = null;
-let cvReady = false;
 let markerGenerated = false;
-
-// Check if OpenCV.js is loaded
-function onOpenCvReady() {
-    cvReady = true;
-    updateStatus("✅ OpenCV.js loaded ready!");
-    console.log("OpenCV.js is ready");
-}
 
 // Upload Image Button
 function uploadImage() {
+    // Reset tracking data if exists
+    if (typeof resetTrackingData === 'function') {
+        resetTrackingData();
+    }
     document.getElementById('fileInput').click();
 }
 
@@ -35,14 +31,18 @@ function handleFileSelect(event) {
         
         // Enable Generate button
         document.getElementById('generateBtn').disabled = false;
+        markerGenerated = false;
+        document.getElementById('saveBtn').disabled = true;
+        document.getElementById('arBtn').disabled = true;
+        
         updateStatus("✅ Image uploaded! Click 'Generate Features'");
     };
     reader.readAsDataURL(file);
 }
 
-// Generate Features Button (Core Feature Extraction)
+// Generate Features Button
 function generateFeatures() {
-    if (!cvReady) {
+    if (!window.cvReady) {
         updateStatus("❌ OpenCV.js not loaded yet. Please wait...");
         return;
     }
@@ -64,7 +64,7 @@ function generateFeatures() {
             document.getElementById('saveBtn').disabled = false;
             document.getElementById('arBtn').disabled = false;
             
-            updateStatus("✅ Features extracted successfully! You can Save or Start AR");
+            updateStatus("✅ Features extracted! You can Save or Start AR");
         } else {
             updateStatus("❌ Feature extraction failed!");
         }
@@ -84,9 +84,8 @@ function saveMarker() {
     link.href = featureData.toDataURL('image/png');
     link.click();
     
-    updateStatus("💾 Marker saved! Print this on A4 colored paper for AR tracking");
+    updateStatus("💾 Marker saved! Print this on A4 colored paper");
 }
-
 
 // Start AR Scene Button
 function startAR() {
@@ -105,14 +104,6 @@ function startAR() {
     }, 100);
 }
 
-// Add stop button functionality (optional but useful)
-function stopAR() {
-    if (typeof stopARScene === 'function') {
-        stopARScene();
-    }
-    document.getElementById('arSection').style.display = 'none';
-}
-
 // Update status display
 function updateStatus(message) {
     document.getElementById('statusText').innerText = message;
@@ -121,8 +112,8 @@ function updateStatus(message) {
 
 // Check OpenCV status periodically
 setInterval(function() {
-    if (!cvReady && typeof cv !== 'undefined') {
-        cvReady = true;
+    if (!window.cvReady && typeof cv !== 'undefined' && cv.Mat) {
+        window.cvReady = true;
         updateStatus("✅ OpenCV.js loaded ready!");
     }
 }, 500);

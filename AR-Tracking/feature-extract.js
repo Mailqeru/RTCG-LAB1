@@ -1,5 +1,4 @@
 // Feature Extraction Module using OpenCV.js
-// ✅ Fully fixed: Scalar cleanup + memory management + OpenCV.js API
 
 let src = null;
 let dst = null;
@@ -43,19 +42,16 @@ function extractFeatures(imageDataUrl, callback) {
         // Step 3: Detect and compute features
         const mask = new cv.Mat(); // empty mask
         orb.detectAndCompute(gray, mask, keypoints, descriptors);
-        mask.delete(); // ✅ Clean up mask (it's a Mat)
+        mask.delete(); // Clean up mask
         
         // Step 4: Draw keypoints on the grayscale image
-        // Convert gray to RGBA for display
         cv.cvtColor(gray, dst, cv.COLOR_GRAY2RGBA, 0);
         
-        // ✅ FIXED: drawKeypoints with 4 params only (OpenCV.js compatible)
-        // ❌ DO NOT call .delete() on cv.Scalar - it doesn't need cleanup!
+        // Draw keypoints (4 params only for OpenCV.js)
         const color = new cv.Scalar(0, 255, 0, 255); // Green [B, G, R, A]
         cv.drawKeypoints(gray, keypoints, dst, color);
-        // ✅ No color.delete() - Scalar is auto-managed in JS
         
-        // Step 5: Display on canvas (do this BEFORE cleanup!)
+        // Step 5: Display on canvas
         const canvas = document.getElementById('featureCanvas');
         cv.imshow(canvas, dst);
         
@@ -64,18 +60,17 @@ function extractFeatures(imageDataUrl, callback) {
         console.log("🔑 Number of keypoints:", keypoints.size());
         console.log("📊 Descriptor shape:", descriptors.rows + "x" + descriptors.cols);
         
-        // ✅ FIXED: Clean up ONLY objects that need manual deletion
-        // Keep dst, keypoints, descriptors for potential AR tracking later
-        src.delete();      // ✅ Mat - needs delete
-        gray.delete();     // ✅ Mat - needs delete
-        orb.delete();      // ✅ ORB detector - needs delete
-        // color.delete(); // ❌ REMOVE THIS - Scalar doesn't have delete()
+        // Clean up OpenCV memory (keep keypoints/descriptors for tracking)
+        src.delete();
+        gray.delete();
+        orb.delete();
+        // color.delete(); // Scalar doesn't need delete
         
-        // Optional: Store feature data globally for AR tracking
+        // Store feature data globally for AR tracking
         window.trackingData = {
-            keypoints: keypoints,      // Keep for matching
-            descriptors: descriptors,  // Keep for matching
-            markerImage: dst           // Keep for reference
+            keypoints: keypoints,
+            descriptors: descriptors,
+            markerImage: dst
         };
         
         callback(true, canvas);
@@ -89,7 +84,7 @@ function extractFeatures(imageDataUrl, callback) {
     }
 }
 
-// ✅ Safe cleanup function - only delete objects that support .delete()
+// Safe cleanup function
 function safeCleanup() {
     const objects = [src, dst, gray, keypoints, descriptors];
     objects.forEach(obj => {
@@ -104,73 +99,7 @@ function safeCleanup() {
     console.log("🧹 Memory cleanup complete");
 }
 
-// ✅ Alternative: Simple detect-only version (more stable)
-function extractFeaturesSimple(imageDataUrl, callback) {
-    try {
-        if (typeof cv === 'undefined' || !cv.Mat) {
-            callback(false, null);
-            return;
-        }
-        
-        const img = document.getElementById('originalImage');
-        src = cv.imread(img);
-        gray = new cv.Mat();
-        
-        cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
-        
-        const orb = new cv.ORB();
-        keypoints = new cv.KeyPointVector();
-        
-        // Detect only (simpler, more compatible)
-        orb.detect(gray, keypoints);
-        
-        dst = new cv.Mat();
-        cv.cvtColor(gray, dst, cv.COLOR_GRAY2RGBA, 0);
-        const color = new cv.Scalar(0, 255, 0, 255); // Green
-        cv.drawKeypoints(gray, keypoints, dst, color); // 4 params only
-        
-        const canvas = document.getElementById('featureCanvas');
-        cv.imshow(canvas, dst);
-        
-        console.log("Simple detection - Keypoints:", keypoints.size());
-        
-        // Cleanup (no Scalar.delete!)
-        src.delete();
-        gray.delete();
-        orb.delete();
-        // Keep dst, keypoints for display/tracking
-        
-        callback(true, canvas);
-        
-    } catch (error) {
-        console.error("Simple extraction error:", error);
-        safeCleanup();
-        callback(false, null);
-    }
-}
-
-// Feature Matching Function (for AR tracking)
-function matchFeatures(descriptors1, descriptors2) {
-    try {
-        const matcher = new cv.BFMatcher(cv.NORM_HAMMING, true);
-        const matches = new cv.DMatchVector();
-        
-        matcher.match(descriptors1, descriptors2, matches);
-        
-        console.log("🎯 Matches found:", matches.size());
-        
-        matcher.delete(); // ✅ BFMatcher needs delete
-        // matches.delete(); // Optional: keep if you need match data
-        
-        return matches;
-        
-    } catch (error) {
-        console.error("Matching error:", error);
-        return null;
-    }
-}
-
-// ✅ Helper: Reset tracking data when uploading new image
+// Helper: Reset tracking data when uploading new image
 function resetTrackingData() {
     safeCleanup();
     window.trackingData = null;
