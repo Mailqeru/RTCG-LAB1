@@ -1,5 +1,3 @@
-
-
 let arScene = null;
 let arCamera = null;
 let arRenderer = null;
@@ -8,19 +6,33 @@ let videoTexture = null;
 let trackingActive = false;
 let currentObjectType = 1;
 let markerDetected = false;
-let arObject = null;
 
-// Smoothing variables for stable tracking
-let smoothedPosition = { x: 0, y: 0, z: 0 };
-let isPositionInitialized = false;
-const SMOOTHING_FACTOR = 0.1; // Lower = smoother 
-const MIN_MOVEMENT_THRESHOLD = 0.05; // Minimum movement to update
+// One arObject per marker (up to 3)
+let arObjects = [null, null, null];
+
+// Smoothing variables per marker
+let smoothedPositions = [
+    { x: 0, y: 0, z: 0 },
+    { x: 0, y: 0, z: 0 },
+    { x: 0, y: 0, z: 0 }
+];
+let isPositionInitialized = [false, false, false];
+
+const SMOOTHING_FACTOR = 0.1;
+const MIN_MOVEMENT_THRESHOLD = 0.05;
 
 // Model cache
 let loadedModels = {};
 
 const objectColors = [0xff0000, 0x00ff00, 0x0000ff];
-const MARKER_MATCH_THRESHOLD = 90;
+const MARKER_MATCH_THRESHOLD = 50;
+
+// Model paths — index 0 = marker 1, index 1 = marker 2, index 2 = marker 3
+const modelPaths = {
+    0: 'models/model1/scene.gltf',
+    1: 'models/model2/scene.gltf',
+    2: 'models/model3/scene.gltf'
+};
 
 function initializeARScene() {
     try {
@@ -29,7 +41,6 @@ function initializeARScene() {
         const container = document.getElementById('arContainer');
         container.innerHTML = '';
         
-        // Create webcam video element
         videoElement = document.createElement('video');
         videoElement.width = 640;
         videoElement.height = 480;
@@ -38,34 +49,25 @@ function initializeARScene() {
         videoElement.style.display = 'none';
         document.body.appendChild(videoElement);
         
-        setupWebcam().then(() => {
-            
-            // Create Three.js scene
+        setupWebcam().then(async () => {
             arScene = new THREE.Scene();
             
-            // Create camera
             arCamera = new THREE.PerspectiveCamera(75, 640 / 480, 0.1, 1000);
             arCamera.position.z = 5;
             
-            // Create renderer
             arRenderer = new THREE.WebGLRenderer({ alpha: false, antialias: true });
             arRenderer.setSize(640, 480);
             arRenderer.setPixelRatio(window.devicePixelRatio);
             container.appendChild(arRenderer.domElement);
             
-            // Create video background
             createVideoBackground();
-            
-            // Add lights
             addLights();
             
-            // Create 3D object but HIDE it initially
-            create3DObject(currentObjectType);
-            if (arObject) {
-                arObject.visible = false;
+            // Pre-load all 3 models and hide them initially
+            for (let i = 0; i < 3; i++) {
+                await create3DObject(i);
             }
             
-            // Start tracking loop
             trackingActive = true;
             animateAR();
             
@@ -129,30 +131,30 @@ async function setupWebcam() {
 }
 
 function addLights() {
-    // Ambient light (general illumination)
     const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
     arScene.add(ambientLight);
     
-    // Directional light (sun-like)
     const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
     directionalLight.position.set(5, 10, 7);
     arScene.add(directionalLight);
     
-    // Second light from opposite side
     const light2 = new THREE.DirectionalLight(0xffffff, 0.5);
     light2.position.set(-5, 5, -5);
     arScene.add(light2);
     
-    // Hemisphere light for better color
     const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
     arScene.add(hemiLight);
 }
 
-async function create3DObject(type) {
-    // Remove existing object
-    if (arObject) {
-        arScene.remove(arObject);
-        arObject.traverse((child) => {
+/**
+ * Creates and registers the 3D object for a given marker index (0-based).
+ * Stores the result in arObjects[markerIndex].
+ */
+async function create3DObject(markerIndex) {
+    // Remove existing object for this marker slot
+    if (arObjects[markerIndex]) {
+        arScene.remove(arObjects[markerIndex]);
+        arObjects[markerIndex].traverse((child) => {
             if (child.isMesh) {
                 if (child.geometry) child.geometry.dispose();
                 if (child.material) {
@@ -164,30 +166,22 @@ async function create3DObject(type) {
                 }
             }
         });
-        arObject = null;
+        arObjects[markerIndex] = null;
     }
     
     try {
-        updateStatus(` Loading model ${type}...`);
+        updateStatus(` Loading model for marker ${markerIndex + 1}...`);
         
-        // Define model paths
-        const modelPaths = {
-            1: 'models/model1/scene.gltf',
-            2: 'models/model2/scene.gltf',
-            3: 'models/model3/scene.gltf'
-        };
+        const modelPath = modelPaths[markerIndex];
         
-        const modelPath = modelPaths[type];
-        
-        // Check if model is already loaded (cache)
-        if (loadedModels[type]) {
-            arObject = loadedModels[type].clone();
-            setupModel(arObject);
-            updateStatus(` Model ${type} loaded (from cache)`);
+        // Return from cache if available
+        if (loadedModels[markerIndex]) {
+            arObjects[markerIndex] = loadedModels[markerIndex].clone();
+            setupModel(arObjects[markerIndex], markerIndex);
+            updateStatus(` Model ${markerIndex + 1} loaded (from cache)`);
             return;
         }
         
-        // Load the model
         const loader = new THREE.GLTFLoader();
         
         const gltf = await new Promise((resolve, reject) => {
@@ -196,40 +190,37 @@ async function create3DObject(type) {
                 resolve,
                 (progress) => {
                     const percent = (progress.loaded / progress.total * 100).toFixed(0);
-                    updateStatus(` Loading: ${percent}%`);
+                    updateStatus(` Loading model ${markerIndex + 1}: ${percent}%`);
                 },
                 reject
             );
         });
         
-        arObject = gltf.scene;
+        arObjects[markerIndex] = gltf.scene;
+        loadedModels[markerIndex] = arObjects[markerIndex].clone();
         
-        // Cache the loaded model
-        loadedModels[type] = arObject.clone();
-        
-        setupModel(arObject);
-        updateStatus(` Model ${type} loaded successfully!`);
+        setupModel(arObjects[markerIndex], markerIndex);
+        updateStatus(` Model ${markerIndex + 1} loaded successfully!`);
         
     } catch (error) {
-        console.error("Model loading error:", error);
-        updateStatus(" Failed to load model: " + error.message);
+        console.error(`Model ${markerIndex + 1} loading error:`, error);
+        updateStatus(` Failed to load model ${markerIndex + 1}: ${error.message}`);
         
-        // Fallback to colored cube if model fails
+        // Fallback cube with unique color per marker
         const geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
-        const material = new THREE.MeshPhongMaterial({ color: 0xff0000 });
-        arObject = new THREE.Mesh(geometry, material);
-        arObject.position.y = 0.5;
-        arScene.add(arObject);
+        const material = new THREE.MeshPhongMaterial({ color: objectColors[markerIndex] });
+        arObjects[markerIndex] = new THREE.Mesh(geometry, material);
+        arObjects[markerIndex].position.y = 0.5;
+        arObjects[markerIndex].visible = false;
+        arScene.add(arObjects[markerIndex]);
     }
 }
 
-function setupModel(model) {
-    model.name = 'arObject';
-    model.visible = false; // Start hidden
+function setupModel(model, markerIndex) {
+    model.name = `arObject_${markerIndex}`;
+    model.visible = false; // Hidden until its marker is detected
     
-    // Make model BIGGER (change 3 to your desired size)
-    model.position.set(0, 0.5, 0);
-    model.scale.set(100, 100, 100); // 
+    model.scale.set(100, 100, 100);
     
     // Center the model
     const box = new THREE.Box3().setFromObject(model);
@@ -238,23 +229,19 @@ function setupModel(model) {
     model.position.y = -center.y + 0.5;
     model.position.z = -center.z;
     
-    // Fix materials and ensure colors/textures show
     model.traverse((child) => {
         if (child.isMesh) {
             child.castShadow = true;
             child.receiveShadow = true;
             
             if (child.material) {
-                // Ensure material is visible from both sides
                 child.material.side = THREE.DoubleSide;
                 child.material.needsUpdate = true;
                 
-                // Enable texture if exists
                 if (child.material.map) {
                     child.material.map.needsUpdate = true;
                 }
                 
-                // Convert to StandardMaterial for better lighting
                 if (!child.material.isMeshStandardMaterial) {
                     child.material = new THREE.MeshStandardMaterial({
                         color: child.material.color || 0xffffff,
@@ -269,19 +256,15 @@ function setupModel(model) {
     });
     
     arScene.add(model);
-    console.log(" Model setup complete");
+    console.log(` Model ${markerIndex + 1} setup complete`);
 }
 
-// Main AR animation loop
 function animateAR() {
     if (!trackingActive) return;
     
     requestAnimationFrame(animateAR);
     
-    // Check if marker is visible
     detectMarker();
-    
-    
     
     if (videoTexture) {
         videoTexture.needsUpdate = true;
@@ -290,7 +273,10 @@ function animateAR() {
     arRenderer.render(arScene, arCamera);
 }
 
-// REAL MARKER DETECTION using OpenCV.js - WITH SMOOTHING
+/**
+ * Detects all registered markers each frame.
+ * Each marker[i] controls arObjects[i] independently.
+ */
 function detectMarker() {
     if (!videoElement || videoElement.readyState !== videoElement.HAVE_ENOUGH_DATA) return;
     if (!window.trackingDataList || window.trackingDataList.length === 0) return;
@@ -313,9 +299,17 @@ function detectMarker() {
         orb.detectAndCompute(frameGray, mask, frameKeypoints, frameDescriptors);
         mask.delete();
 
-        let detected = false;
-        for (let marker of window.trackingDataList) {
+        // Process each registered marker independently
+        for (let markerIndex = 0; markerIndex < window.trackingDataList.length; markerIndex++) {
+            const marker = window.trackingDataList[markerIndex];
+            const arObject = arObjects[markerIndex];
+
+            // Skip if model not loaded yet for this slot
+            if (!arObject) continue;
+
             if (marker.descriptors.empty() || frameDescriptors.empty()) {
+                arObject.visible = false;
+                isPositionInitialized[markerIndex] = false;
                 continue;
             }
 
@@ -342,9 +336,9 @@ function detectMarker() {
                 }
             }
 
-            if (goodMatches.length > MARKER_MATCH_THRESHOLD) {
-                detected = true;
+            let detectedThisMarker = false;
 
+            if (goodMatches.length > MARKER_MATCH_THRESHOLD) {
                 let srcPts = [];
                 let dstPts = [];
                 for (let m of goodMatches) {
@@ -374,33 +368,34 @@ function detectMarker() {
                         const centerX = (data[0] + data[2] + data[4] + data[6]) / 4;
                         const centerY = (data[1] + data[3] + data[5] + data[7]) / 4;
 
-                        // Map video coords to Three.js coords
                         const x = (centerX / videoElement.videoWidth - 0.5) * 16;
                         const y = -(centerY / videoElement.videoHeight - 0.5) * 12;
 
-                        if (arObject) {
+                        // Apply per-marker smoothing
+                        if (!isPositionInitialized[markerIndex]) {
+                            smoothedPositions[markerIndex].x = x;
+                            smoothedPositions[markerIndex].y = y;
+                            smoothedPositions[markerIndex].z = 0;
+                            isPositionInitialized[markerIndex] = true;
+                        } else {
+                            const deltaX = x - smoothedPositions[markerIndex].x;
+                            const deltaY = y - smoothedPositions[markerIndex].y;
+                            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
                             
-                            if (!isPositionInitialized) {
-                                smoothedPosition.x = x;
-                                smoothedPosition.y = y;
-                                smoothedPosition.z = 0;
-                                isPositionInitialized = true;
-                            } else {
-                                // Only update if moved enough
-                                const deltaX = x - smoothedPosition.x;
-                                const deltaY = y - smoothedPosition.y;
-                                const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-                                
-                                if (distance > MIN_MOVEMENT_THRESHOLD) {
-                                    smoothedPosition.x += (x - smoothedPosition.x) * SMOOTHING_FACTOR;
-                                    smoothedPosition.y += (y - smoothedPosition.y) * SMOOTHING_FACTOR;
-                                    smoothedPosition.z += (0 - smoothedPosition.z) * SMOOTHING_FACTOR;
-                                }
+                            if (distance > MIN_MOVEMENT_THRESHOLD) {
+                                smoothedPositions[markerIndex].x += (x - smoothedPositions[markerIndex].x) * SMOOTHING_FACTOR;
+                                smoothedPositions[markerIndex].y += (y - smoothedPositions[markerIndex].y) * SMOOTHING_FACTOR;
+                                smoothedPositions[markerIndex].z += (0 - smoothedPositions[markerIndex].z) * SMOOTHING_FACTOR;
                             }
-                            
-                            arObject.position.set(smoothedPosition.x, smoothedPosition.y, smoothedPosition.z);
-                            arObject.visible = true;
                         }
+                        
+                        arObject.position.set(
+                            smoothedPositions[markerIndex].x,
+                            smoothedPositions[markerIndex].y,
+                            smoothedPositions[markerIndex].z
+                        );
+                        arObject.visible = true;
+                        detectedThisMarker = true;
 
                         transformedCorners.delete();
                         corners.delete();
@@ -412,14 +407,14 @@ function detectMarker() {
                 }
             }
 
+            // Hide this marker's model if not detected this frame
+            if (!detectedThisMarker) {
+                arObject.visible = false;
+                isPositionInitialized[markerIndex] = false;
+            }
+
             matcher.delete();
             matches.delete();
-        }
-
-        // Hide object if no marker detected
-        if (!detected && arObject) {
-            arObject.visible = false;
-            isPositionInitialized = false; // Reset smoothing
         }
 
         orb.delete();
@@ -438,17 +433,18 @@ function detectMarker() {
             stack: error.stack,
             videoReady: videoElement?.readyState,
             trackingDataCount: window.trackingDataList?.length,
-            arObjectExists: !!arObject
         });
-        if (arObject) arObject.visible = false;
+        arObjects.forEach(obj => { if (obj) obj.visible = false; });
     }
 }
 
 async function switch3DObject(index) {
+    // index is 1-based from UI; convert to 0-based
     currentObjectType = index;
-    await create3DObject(index);
+    const markerIndex = index - 1;
+    await create3DObject(markerIndex);
     const names = ['Model 1', 'Model 2', 'Model 3'];
-    updateStatus(` Switched to: ${names[index-1]}`);
+    updateStatus(` Reloaded: ${names[markerIndex]}`);
 }
 
 function stopARScene() {
@@ -492,9 +488,9 @@ function stopARScene() {
     arRenderer = null;
     videoElement = null;
     videoTexture = null;
-    arObject = null;
+    arObjects = [null, null, null];
     loadedModels = {};
-    isPositionInitialized = false;
+    isPositionInitialized = [false, false, false];
     
     console.log(" AR stopped");
     updateStatus(" AR stopped");

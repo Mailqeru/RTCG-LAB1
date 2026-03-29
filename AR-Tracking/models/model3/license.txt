@@ -1,0 +1,11 @@
+Model Information:
+* title:	Kawasaki Ninja ZX-6R 2020
+* source:	https://sketchfab.com/3d-models/kawasaki-ninja-zx-6r-2020-00e614c09c604b8ab09047481d4ff4ba
+* author:	theguyfran (https://sketchfab.com/theguyfran)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Kawasaki Ninja ZX-6R 2020" (https://sketchfab.com/3d-models/kawasaki-ninja-zx-6r-2020-00e614c09c604b8ab09047481d4ff4ba) by theguyfran (https://sketchfab.com/theguyfran) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
