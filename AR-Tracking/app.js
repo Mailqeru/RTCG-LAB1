@@ -10,7 +10,7 @@ function uploadImage() {
     }
 
     if (window.trackingDataList.length >= 3) {
-        updateStatus("⚠️ Max 3 markers only! Cannot upload more.");
+        updateStatus(" Max 3 markers only! Cannot upload more.");
         return; // stop uploading if already 3 markers
     }
 
@@ -24,7 +24,7 @@ function handleFileSelect(event) {
     
     // Check if file is an image
     if (!file.type.match('image.*')) {
-        updateStatus("❌ Please select a valid image file!");
+        updateStatus(" Please select a valid image file!");
         return;
     }
     
@@ -40,7 +40,7 @@ function handleFileSelect(event) {
         document.getElementById('saveBtn').disabled = true;
         document.getElementById('arBtn').disabled = true;
         
-        updateStatus("✅ Image uploaded! Click 'Generate Features'");
+        updateStatus("Image uploaded! Click 'Generate Features'");
     };
     reader.readAsDataURL(file);
 }
@@ -48,16 +48,16 @@ function handleFileSelect(event) {
 // Generate Features Button
 function generateFeatures() {
     if (!window.cvReady) {
-        updateStatus("❌ OpenCV.js not loaded yet. Please wait...");
+        updateStatus(" OpenCV.js not loaded yet. Please wait...");
         return;
     }
     
     if (!originalImageData) {
-        updateStatus("❌ No image uploaded!");
+        updateStatus(" No image uploaded!");
         return;
     }
     
-    updateStatus("⚙️ Processing image - Extracting features...");
+    updateStatus(" Processing image - Extracting features...");
     
     // Call feature extraction function
     extractFeatures(originalImageData, function(success, canvas) {
@@ -69,9 +69,9 @@ function generateFeatures() {
             document.getElementById('saveBtn').disabled = false;
             document.getElementById('arBtn').disabled = false;
             
-            updateStatus("✅ Features extracted! You can Save or Start AR");
+            updateStatus("Features extracted! You can Save or Start AR");
         } else {
-            updateStatus("❌ Feature extraction failed!");
+            updateStatus(" Feature extraction failed!");
         }
     });
 }
@@ -79,7 +79,7 @@ function generateFeatures() {
 // Save Marker Button
 function saveMarker() {
     if (!featureData) {
-        updateStatus("❌ No features generated to save!");
+        updateStatus(" No features generated to save!");
         return;
     }
     
@@ -89,19 +89,19 @@ function saveMarker() {
     link.href = featureData.toDataURL('image/png');
     link.click();
     
-    updateStatus("💾 Marker saved! Print this on A4 colored paper");
+    updateStatus(" Marker saved! Print this on A4 colored paper");
 }
 
 // Start AR Scene Button
 function startAR() {
     if (!markerGenerated) {
-        updateStatus("❌ Generate features first!");
+        updateStatus(" Generate features first!");
         return;
     }
     
     // Show AR section
     document.getElementById('arSection').style.display = 'block';
-    updateStatus("🎬 AR Scene starting... Please allow camera access");
+    updateStatus(" AR Scene starting... Please allow camera access");
     
     // Small delay to ensure DOM is ready
     setTimeout(() => {
@@ -119,7 +119,7 @@ function updateStatus(message) {
 setInterval(function() {
     if (!window.cvReady && typeof cv !== 'undefined' && cv.Mat) {
         window.cvReady = true;
-        updateStatus("✅ OpenCV.js loaded ready!");
+        updateStatus("OpenCV.js loaded ready!");
     }
 }, 500);
 
@@ -129,7 +129,7 @@ function renderMarkerList() {
 
     if (!window.trackingDataList) return;
 
-    const names = ["Cube", "Sphere", "Pyramid"];
+    const names = ["Sonic", "Car", "Motocycle"];
 
     window.trackingDataList.forEach((marker, index) => {
         const div = document.createElement("div");
@@ -160,5 +160,5 @@ function removeMarker(index) {
     });
 
     renderMarkerList();
-    updateStatus("🗑️ Marker removed");
+    updateStatus(" Marker removed");
 }

@@ -1,4 +1,4 @@
-// AR Scene Module with REAL Marker Detection - FIXED VERSION
+
 
 let arScene = null;
 let arCamera = null;
@@ -13,18 +13,18 @@ let arObject = null;
 // Smoothing variables for stable tracking
 let smoothedPosition = { x: 0, y: 0, z: 0 };
 let isPositionInitialized = false;
-const SMOOTHING_FACTOR = 0.1; // Lower = smoother (0.05-0.2)
+const SMOOTHING_FACTOR = 0.1; // Lower = smoother 
 const MIN_MOVEMENT_THRESHOLD = 0.05; // Minimum movement to update
 
 // Model cache
 let loadedModels = {};
 
 const objectColors = [0xff0000, 0x00ff00, 0x0000ff];
-const MARKER_MATCH_THRESHOLD = 10;
+const MARKER_MATCH_THRESHOLD = 90;
 
 function initializeARScene() {
     try {
-        updateStatus("🎥 Initializing AR scene...");
+        updateStatus(" Initializing AR scene...");
         
         const container = document.getElementById('arContainer');
         container.innerHTML = '';
@@ -69,16 +69,16 @@ function initializeARScene() {
             trackingActive = true;
             animateAR();
             
-            updateStatus("✅ AR active! Show your PRINTED marker to webcam");
+            updateStatus(" AR active! Show your PRINTED marker to webcam");
             
         }).catch(error => {
-            console.error("❌ Webcam setup failed:", error);
-            updateStatus("❌ Cannot access webcam. Allow camera permissions!");
+            console.error(" Webcam setup failed:", error);
+            updateStatus(" Cannot access webcam. Allow camera permissions!");
         });
         
     } catch (error) {
-        console.error("❌ AR initialization error:", error);
-        updateStatus("❌ AR failed: " + error.message);
+        console.error(" AR initialization error:", error);
+        updateStatus(" AR failed: " + error.message);
     }
 }
 
@@ -117,13 +117,13 @@ async function setupWebcam() {
         await new Promise((resolve) => {
             videoElement.onloadedmetadata = () => {
                 videoElement.play();
-                console.log("✅ Webcam ready");
+                console.log(" Webcam ready");
                 resolve();
             };
         });
         
     } catch (error) {
-        console.error("❌ Webcam error:", error);
+        console.error(" Webcam error:", error);
         throw error;
     }
 }
@@ -168,11 +168,11 @@ async function create3DObject(type) {
     }
     
     try {
-        updateStatus(`📦 Loading model ${type}...`);
+        updateStatus(` Loading model ${type}...`);
         
         // Define model paths
         const modelPaths = {
-            1: 'models/model2/scene.gltf',
+            1: 'models/model1/scene.gltf',
             2: 'models/model2/scene.gltf',
             3: 'models/model3/scene.gltf'
         };
@@ -183,7 +183,7 @@ async function create3DObject(type) {
         if (loadedModels[type]) {
             arObject = loadedModels[type].clone();
             setupModel(arObject);
-            updateStatus(`✅ Model ${type} loaded (from cache)`);
+            updateStatus(` Model ${type} loaded (from cache)`);
             return;
         }
         
@@ -196,7 +196,7 @@ async function create3DObject(type) {
                 resolve,
                 (progress) => {
                     const percent = (progress.loaded / progress.total * 100).toFixed(0);
-                    updateStatus(`📥 Loading: ${percent}%`);
+                    updateStatus(` Loading: ${percent}%`);
                 },
                 reject
             );
@@ -208,11 +208,11 @@ async function create3DObject(type) {
         loadedModels[type] = arObject.clone();
         
         setupModel(arObject);
-        updateStatus(`✅ Model ${type} loaded successfully!`);
+        updateStatus(` Model ${type} loaded successfully!`);
         
     } catch (error) {
-        console.error("❌ Model loading error:", error);
-        updateStatus("❌ Failed to load model: " + error.message);
+        console.error("Model loading error:", error);
+        updateStatus(" Failed to load model: " + error.message);
         
         // Fallback to colored cube if model fails
         const geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
@@ -229,7 +229,7 @@ function setupModel(model) {
     
     // Make model BIGGER (change 3 to your desired size)
     model.position.set(0, 0.5, 0);
-    model.scale.set(100, 100, 100); // 👈 3x bigger!
+    model.scale.set(100, 100, 100); // 
     
     // Center the model
     const box = new THREE.Box3().setFromObject(model);
@@ -269,7 +269,7 @@ function setupModel(model) {
     });
     
     arScene.add(model);
-    console.log("✅ Model setup complete");
+    console.log(" Model setup complete");
 }
 
 // Main AR animation loop
@@ -281,7 +281,7 @@ function animateAR() {
     // Check if marker is visible
     detectMarker();
     
-    // ❌ NO AUTO-ROTATION - Model stays static on marker
+    
     
     if (videoTexture) {
         videoTexture.needsUpdate = true;
@@ -379,7 +379,7 @@ function detectMarker() {
                         const y = -(centerY / videoElement.videoHeight - 0.5) * 12;
 
                         if (arObject) {
-                            // 👇 SMOOTHED POSITION UPDATE
+                            
                             if (!isPositionInitialized) {
                                 smoothedPosition.x = x;
                                 smoothedPosition.y = y;
@@ -433,7 +433,7 @@ function detectMarker() {
         }
 
     } catch (error) {
-        console.error("❌ Marker detection error:", {
+        console.error(" Marker detection error:", {
             message: error.message,
             stack: error.stack,
             videoReady: videoElement?.readyState,
@@ -448,7 +448,7 @@ async function switch3DObject(index) {
     currentObjectType = index;
     await create3DObject(index);
     const names = ['Model 1', 'Model 2', 'Model 3'];
-    updateStatus(`🎯 Switched to: ${names[index-1]}`);
+    updateStatus(` Switched to: ${names[index-1]}`);
 }
 
 function stopARScene() {
@@ -496,6 +496,6 @@ function stopARScene() {
     loadedModels = {};
     isPositionInitialized = false;
     
-    console.log("🛑 AR stopped");
-    updateStatus("⏹️ AR stopped");
+    console.log(" AR stopped");
+    updateStatus(" AR stopped");
 }

@@ -10,7 +10,7 @@ function extractFeatures(imageDataUrl, callback) {
     try {
         // Wait for OpenCV to be fully ready
         if (typeof cv === 'undefined' || !cv.Mat) {
-            console.error("❌ OpenCV.js not loaded yet!");
+            console.error(" OpenCV.js not loaded yet!");
             callback(false, null);
             return;
         }
@@ -19,7 +19,7 @@ function extractFeatures(imageDataUrl, callback) {
         const img = document.getElementById('originalImage');
         
         if (!img || !img.src || img.naturalWidth === 0) {
-            console.error("❌ No valid image loaded!");
+            console.error(" No valid image loaded!");
             callback(false, null);
             return;
         }
@@ -56,15 +56,14 @@ function extractFeatures(imageDataUrl, callback) {
         cv.imshow(canvas, dst);
         
         // Log feature information
-        console.log("✅ Features extracted successfully!");
-        console.log("🔑 Number of keypoints:", keypoints.size());
-        console.log("📊 Descriptor shape:", descriptors.rows + "x" + descriptors.cols);
+        console.log(" Features extracted successfully!");
+        console.log(" Number of keypoints:", keypoints.size());
+        console.log("Descriptor shape:", descriptors.rows + "x" + descriptors.cols);
         
         // Clean up OpenCV memory (keep keypoints/descriptors for tracking)
         src.delete();
         gray.delete();
         orb.delete();
-        // color.delete(); // Scalar doesn't need delete
         
         // Store feature data globally for AR tracking
         // Ensure tracking list exists
@@ -74,7 +73,7 @@ if (!window.trackingDataList) {
 
 // Limit to 3 markers
 if (window.trackingDataList.length >= 3) {
-    updateStatus("⚠️ Max 3 markers only!");
+    updateStatus(" Max 3 markers only!");
     return callback(true, canvas);
 }
 
@@ -98,11 +97,11 @@ renderMarkerList();
 // Enable AR button
 document.getElementById('arBtn').disabled = false;
 
-updateStatus(`✅ Marker ${type} saved`);
+updateStatus(` Marker ${type} saved`);
 callback(true, canvas);
         
     } catch (error) {
-        console.error("❌ Feature extraction error:", error.name, error.message);
+        console.error("Feature extraction error:", error.name, error.message);
         
         // Safe cleanup on error
         safeCleanup();
@@ -130,5 +129,5 @@ function resetTrackingData() {
     safeCleanup();
     window.trackingDataList = [];
     renderMarkerList();
-    console.log("🔄 Tracking data reset");
+    console.log("Tracking data reset");
 }

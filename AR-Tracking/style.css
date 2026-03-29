@@ -5,126 +5,155 @@
 }
 
 body {
-    font-family: 'Arial', sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    font-family: 'Segoe UI', 'Roboto', sans-serif;
+    background: linear-gradient(135deg, #0a0e27 0%, #1a1f3f 50%, #0d1b2a 100%);
     min-height: 100vh;
     padding: 20px;
+    color: #e0e0e0;
 }
 
 .container {
     max-width: 1200px;
     margin: 0 auto;
-    background: white;
-    border-radius: 15px;
-    padding: 30px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 h1 {
     text-align: center;
-    color: #333;
+    color: #00d4ff;
     margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    font-weight: 700;
+    text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
 }
 
 .subtitle {
     text-align: center;
-    color: #666;
-    margin-bottom: 30px;
+    color: #8892b0;
+    margin-bottom: 40px;
+    font-size: 14px;
+    letter-spacing: 1px;
 }
 
 .ui-controls {
     display: flex;
     justify-content: center;
-    gap: 15px;
-    margin-bottom: 30px;
+    gap: 20px;
+    margin-bottom: 40px;
     flex-wrap: wrap;
 }
 
 .ui-controls button {
-    padding: 12px 25px;
-    font-size: 16px;
-    border: none;
-    border-radius: 8px;
+    padding: 14px 30px;
+    font-size: 14px;
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    border-radius: 5px;
     cursor: pointer;
     transition: all 0.3s ease;
-    font-weight: bold;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    background: rgba(0, 212, 255, 0.1);
+    color: #00d4ff;
 }
 
 #uploadBtn {
-    background: #4CAF50;
-    color: white;
+    border-color: rgba(0, 255, 136, 0.3);
+    background: rgba(0, 255, 136, 0.1);
+    color: #00ff88;
 }
 
 #generateBtn {
-    background: #2196F3;
-    color: white;
+    border-color: rgba(0, 212, 255, 0.3);
+    background: rgba(0, 212, 255, 0.1);
+    color: #00d4ff;
 }
 
 #saveBtn {
-    background: #FF9800;
-    color: white;
+    border-color: rgba(255, 179, 71, 0.3);
+    background: rgba(255, 179, 71, 0.1);
+    color: #ffb347;
 }
 
 #arBtn {
-    background: #9C27B0;
-    color: white;
+    border-color: rgba(189, 71, 255, 0.3);
+    background: rgba(189, 71, 255, 0.1);
+    color: #bd47ff;
 }
 
 .ui-controls button:disabled {
-    background: #ccc;
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #555;
     cursor: not-allowed;
 }
 
 .ui-controls button:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    transform: translateY(-3px);
+    box-shadow: 0 10px 30px rgba(0, 212, 255, 0.3);
+    background: rgba(0, 212, 255, 0.2);
 }
 
 .image-section {
     display: flex;
     justify-content: center;
-    gap: 30px;
+    gap: 40px;
     flex-wrap: wrap;
-    margin-bottom: 30px;
+    margin-bottom: 40px;
 }
 
 .image-box {
     text-align: center;
-    border: 2px solid #ddd;
-    border-radius: 10px;
-    padding: 15px;
-    background: #f9f9f9;
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    border-radius: 15px;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.3);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
 }
 
 .image-box h3 {
-    margin-bottom: 10px;
-    color: #555;
+    margin-bottom: 15px;
+    color: #00d4ff;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
 }
 
 #originalImage {
     max-width: 400px;
     max-height: 300px;
-    border-radius: 5px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 #featureCanvas {
     max-width: 400px;
     max-height: 300px;
-    border: 1px solid #999;
-    border-radius: 5px;
+    border: 1px solid #00d4ff;
+    border-radius: 8px;
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
 }
 
 .status-box {
-    background: #e3f2fd;
-    padding: 15px;
-    border-radius: 8px;
+    background: rgba(0, 212, 255, 0.1);
+    padding: 20px;
+    border-radius: 10px;
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 30px;
+    border: 1px solid rgba(0, 212, 255, 0.2);
 }
 
 #statusText {
-    font-weight: bold;
-    color: #1976D2;
+    font-weight: 600;
+    color: #00d4ff;
+    font-size: 14px;
+    letter-spacing: 1px;
 }
 
 #arContainer {
@@ -132,9 +161,60 @@ h1 {
     max-width: 640px;
     height: 480px;
     margin: 0 auto;
-    border: 3px solid #333;
-    border-radius: 10px;
+    border: 2px solid #00d4ff;
+    border-radius: 15px;
     overflow: hidden;
     background: #000;
+    box-shadow: 0 0 30px rgba(0, 212, 255, 0.4), inset 0 0 50px rgba(0, 0, 0, 0.5);
+    position: relative;
 }
 
+#arContainer::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, transparent 48%, rgba(0, 212, 255, 0.1) 50%, transparent 52%);
+    background-size: 20px 20px;
+    pointer-events: none;
+    opacity: 0.3;
+}
+
+/* AR Theme Accent Elements */
+.container::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100px;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, #00d4ff, transparent);
+    border-radius: 2px;
+}
+
+/* Scan Line Effect */
+@keyframes scanLine {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100%); }
+}
+
+.scan-overlay {
+    position: relative;
+    overflow: hidden;
+}
+
+.scan-overlay::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #00d4ff;
+    box-shadow: 0 0 10px #00d4ff;
+    animation: scanLine 3s linear infinite;
+    opacity: 0.5;
+}
