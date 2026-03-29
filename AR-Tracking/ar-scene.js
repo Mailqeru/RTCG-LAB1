@@ -25,7 +25,7 @@ const MIN_MOVEMENT_THRESHOLD = 0.05;
 let loadedModels = {};
 
 const objectColors = [0xff0000, 0x00ff00, 0x0000ff];
-const MARKER_MATCH_THRESHOLD = 50;
+const MARKER_MATCH_THRESHOLD = 30;
 
 // Model paths — index 0 = marker 1, index 1 = marker 2, index 2 = marker 3
 const modelPaths = {
@@ -33,6 +33,129 @@ const modelPaths = {
     1: 'models/model2/scene.gltf',
     2: 'models/model3/scene.gltf'
 };
+
+// Per-model scale settings — user can adjust independently
+let modelScales = [60, 60, 60];
+
+// ─── Scale UI ────────────────────────────────────────────────────────────────
+
+function createScaleUI() {
+    const existing = document.getElementById('scaleControlPanel');
+    if (existing) existing.remove();
+
+    const panel = document.createElement('div');
+    panel.id = 'scaleControlPanel';
+    panel.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: rgba(0,0,0,0.78);
+        color: #fff;
+        padding: 14px 18px;
+        border-radius: 12px;
+        font-family: sans-serif;
+        font-size: 13px;
+        z-index: 9999;
+        min-width: 230px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        user-select: none;
+    `;
+
+    panel.innerHTML = `<div style="font-weight:700;font-size:14px;margin-bottom:12px;">⚖️ Model Scale</div>`;
+
+    for (let i = 0; i < 3; i++) {
+        const row = document.createElement('div');
+        row.style.cssText = 'margin-bottom:12px;';
+        row.innerHTML = `
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+                <span style="min-width:58px;font-weight:600;">Model ${i + 1}</span>
+                <button onclick="adjustScale(${i}, -10)" style="${btnStyle()}">−</button>
+                <input
+                    id="scaleInput_${i}"
+                    type="number"
+                    min="1" max="9999"
+                    value="${modelScales[i]}"
+                    style="${inputStyle()}"
+                    onchange="applyScaleFromInput(${i})"
+                />
+                <button onclick="adjustScale(${i}, 10)" style="${btnStyle()}">+</button>
+            </div>
+            <input
+                id="scaleSlider_${i}"
+                type="range"
+                min="1" max="500"
+                value="${Math.min(modelScales[i], 500)}"
+                style="width:100%;accent-color:#4af;cursor:pointer;"
+                oninput="applyScaleFromSlider(${i})"
+            />
+        `;
+        panel.appendChild(row);
+    }
+
+    document.body.appendChild(panel);
+}
+
+function btnStyle() {
+    return `background:#444;border:1px solid #666;color:#fff;border-radius:6px;
+            width:26px;height:26px;cursor:pointer;font-size:16px;line-height:1;padding:0;`;
+}
+
+function inputStyle() {
+    return `width:60px;background:#222;border:1px solid #555;color:#fff;
+            border-radius:6px;padding:2px 6px;font-size:13px;text-align:center;`;
+}
+
+// +/- buttons
+function adjustScale(markerIndex, delta) {
+    modelScales[markerIndex] = Math.max(1, modelScales[markerIndex] + delta);
+    syncScaleUI(markerIndex);
+    applyScaleToModel(markerIndex);
+}
+
+// Typed number input
+function applyScaleFromInput(markerIndex) {
+    const input = document.getElementById(`scaleInput_${markerIndex}`);
+    const val = parseFloat(input.value);
+    if (!isNaN(val) && val >= 1) {
+        modelScales[markerIndex] = val;
+        syncScaleUI(markerIndex);
+        applyScaleToModel(markerIndex);
+    }
+}
+
+// Slider drag
+function applyScaleFromSlider(markerIndex) {
+    const slider = document.getElementById(`scaleSlider_${markerIndex}`);
+    modelScales[markerIndex] = parseFloat(slider.value);
+    syncScaleUI(markerIndex);
+    applyScaleToModel(markerIndex);
+}
+
+// Keep number input and slider values in sync with each other
+function syncScaleUI(markerIndex) {
+    const input = document.getElementById(`scaleInput_${markerIndex}`);
+    const slider = document.getElementById(`scaleSlider_${markerIndex}`);
+    if (input) input.value = modelScales[markerIndex];
+    if (slider) slider.value = Math.min(modelScales[markerIndex], 500);
+}
+
+// Push scale change into the live Three.js object
+function applyScaleToModel(markerIndex) {
+    const obj = arObjects[markerIndex];
+    if (!obj) return;
+    const s = modelScales[markerIndex];
+    obj.scale.set(s, s, s);
+
+    // Re-center after scale change so the model stays on top of the marker
+    const box = new THREE.Box3().setFromObject(obj);
+    const center = box.getCenter(new THREE.Vector3());
+    const pos = smoothedPositions[markerIndex];
+    obj.position.x = -center.x + pos.x;
+    obj.position.y = -center.y + 0.5 + pos.y;
+    obj.position.z = -center.z + pos.z;
+}
+
+// ─── AR Core ─────────────────────────────────────────────────────────────────
 
 function initializeARScene() {
     try {
@@ -63,10 +186,12 @@ function initializeARScene() {
             createVideoBackground();
             addLights();
             
-            // Pre-load all 3 models and hide them initially
             for (let i = 0; i < 3; i++) {
                 await create3DObject(i);
             }
+
+            // Show scale panel after models load
+            createScaleUI();
             
             trackingActive = true;
             animateAR();
@@ -99,18 +224,13 @@ function createVideoBackground() {
     const videoPlane = new THREE.Mesh(videoGeometry, videoMaterial);
     videoPlane.position.z = -5;
     videoPlane.name = 'videoBackground';
-    
     arScene.add(videoPlane);
 }
 
 async function setupWebcam() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-                width: { ideal: 640 },
-                height: { ideal: 480 },
-                facingMode: 'user'
-            },
+            video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
             audio: false
         });
         
@@ -123,7 +243,6 @@ async function setupWebcam() {
                 resolve();
             };
         });
-        
     } catch (error) {
         console.error(" Webcam error:", error);
         throw error;
@@ -131,38 +250,28 @@ async function setupWebcam() {
 }
 
 function addLights() {
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
-    arScene.add(ambientLight);
+    arScene.add(new THREE.AmbientLight(0xffffff, 1.0));
     
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
-    directionalLight.position.set(5, 10, 7);
-    arScene.add(directionalLight);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    dirLight.position.set(5, 10, 7);
+    arScene.add(dirLight);
     
-    const light2 = new THREE.DirectionalLight(0xffffff, 0.5);
-    light2.position.set(-5, 5, -5);
-    arScene.add(light2);
+    const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
+    dirLight2.position.set(-5, 5, -5);
+    arScene.add(dirLight2);
     
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
-    arScene.add(hemiLight);
+    arScene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 0.6));
 }
 
-/**
- * Creates and registers the 3D object for a given marker index (0-based).
- * Stores the result in arObjects[markerIndex].
- */
 async function create3DObject(markerIndex) {
-    // Remove existing object for this marker slot
     if (arObjects[markerIndex]) {
         arScene.remove(arObjects[markerIndex]);
         arObjects[markerIndex].traverse((child) => {
             if (child.isMesh) {
                 if (child.geometry) child.geometry.dispose();
                 if (child.material) {
-                    if (Array.isArray(child.material)) {
-                        child.material.forEach(mat => mat.dispose());
-                    } else {
-                        child.material.dispose();
-                    }
+                    (Array.isArray(child.material) ? child.material : [child.material])
+                        .forEach(mat => mat.dispose());
                 }
             }
         });
@@ -174,7 +283,6 @@ async function create3DObject(markerIndex) {
         
         const modelPath = modelPaths[markerIndex];
         
-        // Return from cache if available
         if (loadedModels[markerIndex]) {
             arObjects[markerIndex] = loadedModels[markerIndex].clone();
             setupModel(arObjects[markerIndex], markerIndex);
@@ -183,7 +291,6 @@ async function create3DObject(markerIndex) {
         }
         
         const loader = new THREE.GLTFLoader();
-        
         const gltf = await new Promise((resolve, reject) => {
             loader.load(
                 modelPath,
@@ -198,7 +305,6 @@ async function create3DObject(markerIndex) {
         
         arObjects[markerIndex] = gltf.scene;
         loadedModels[markerIndex] = arObjects[markerIndex].clone();
-        
         setupModel(arObjects[markerIndex], markerIndex);
         updateStatus(` Model ${markerIndex + 1} loaded successfully!`);
         
@@ -206,7 +312,7 @@ async function create3DObject(markerIndex) {
         console.error(`Model ${markerIndex + 1} loading error:`, error);
         updateStatus(` Failed to load model ${markerIndex + 1}: ${error.message}`);
         
-        // Fallback cube with unique color per marker
+        // Fallback colored cube
         const geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
         const material = new THREE.MeshPhongMaterial({ color: objectColors[markerIndex] });
         arObjects[markerIndex] = new THREE.Mesh(geometry, material);
@@ -218,11 +324,13 @@ async function create3DObject(markerIndex) {
 
 function setupModel(model, markerIndex) {
     model.name = `arObject_${markerIndex}`;
-    model.visible = false; // Hidden until its marker is detected
+    model.visible = false;
+
+    // Use the user-controlled scale for this model slot
+    const s = modelScales[markerIndex];
+    model.scale.set(s, s, s);
     
-    model.scale.set(100, 100, 100);
-    
-    // Center the model
+    // Center the model origin
     const box = new THREE.Box3().setFromObject(model);
     const center = box.getCenter(new THREE.Vector3());
     model.position.x = -center.x;
@@ -237,10 +345,7 @@ function setupModel(model, markerIndex) {
             if (child.material) {
                 child.material.side = THREE.DoubleSide;
                 child.material.needsUpdate = true;
-                
-                if (child.material.map) {
-                    child.material.map.needsUpdate = true;
-                }
+                if (child.material.map) child.material.map.needsUpdate = true;
                 
                 if (!child.material.isMeshStandardMaterial) {
                     child.material = new THREE.MeshStandardMaterial({
@@ -256,27 +361,17 @@ function setupModel(model, markerIndex) {
     });
     
     arScene.add(model);
-    console.log(` Model ${markerIndex + 1} setup complete`);
+    console.log(` Model ${markerIndex + 1} ready (scale: ${s})`);
 }
 
 function animateAR() {
     if (!trackingActive) return;
-    
     requestAnimationFrame(animateAR);
-    
     detectMarker();
-    
-    if (videoTexture) {
-        videoTexture.needsUpdate = true;
-    }
-    
+    if (videoTexture) videoTexture.needsUpdate = true;
     arRenderer.render(arScene, arCamera);
 }
 
-/**
- * Detects all registered markers each frame.
- * Each marker[i] controls arObjects[i] independently.
- */
 function detectMarker() {
     if (!videoElement || videoElement.readyState !== videoElement.HAVE_ENOUGH_DATA) return;
     if (!window.trackingDataList || window.trackingDataList.length === 0) return;
@@ -299,12 +394,10 @@ function detectMarker() {
         orb.detectAndCompute(frameGray, mask, frameKeypoints, frameDescriptors);
         mask.delete();
 
-        // Process each registered marker independently
         for (let markerIndex = 0; markerIndex < window.trackingDataList.length; markerIndex++) {
             const marker = window.trackingDataList[markerIndex];
             const arObject = arObjects[markerIndex];
 
-            // Skip if model not loaded yet for this slot
             if (!arObject) continue;
 
             if (marker.descriptors.empty() || frameDescriptors.empty()) {
@@ -322,29 +415,21 @@ function detectMarker() {
                 try {
                     const matchVec = matches.get(i);
                     if (!matchVec || matchVec.size() < 2) continue;
-                    
                     const m = matchVec.get(0);
                     const n = matchVec.get(1);
-                    
                     if (m && n && typeof m.distance === 'number' && typeof n.distance === 'number') {
-                        if (m.distance < 0.75 * n.distance) {
-                            goodMatches.push(m);
-                        }
+                        if (m.distance < 0.75 * n.distance) goodMatches.push(m);
                     }
-                } catch (e) {
-                    continue;
-                }
+                } catch (e) { continue; }
             }
 
             let detectedThisMarker = false;
 
             if (goodMatches.length > MARKER_MATCH_THRESHOLD) {
-                let srcPts = [];
-                let dstPts = [];
+                let srcPts = [], dstPts = [];
                 for (let m of goodMatches) {
                     const kp = marker.keypoints.get(m.queryIdx).pt;
                     srcPts.push(kp.x, kp.y);
-
                     const fp = frameKeypoints.get(m.trainIdx).pt;
                     dstPts.push(fp.x, fp.y);
                 }
@@ -355,13 +440,13 @@ function detectMarker() {
                     const H = cv.findHomography(srcMat, dstMat, cv.RANSAC, 5.0);
 
                     if (H && !H.empty()) {
-                        let corners = cv.matFromArray(4, 1, cv.CV_32FC2, [
+                        const corners = cv.matFromArray(4, 1, cv.CV_32FC2, [
                             0, 0,
                             marker.imageWidth, 0,
                             marker.imageWidth, marker.imageHeight,
                             0, marker.imageHeight
                         ]);
-                        let transformedCorners = new cv.Mat();
+                        const transformedCorners = new cv.Mat();
                         cv.perspectiveTransform(corners, transformedCorners, H);
 
                         const data = transformedCorners.data32F;
@@ -371,20 +456,15 @@ function detectMarker() {
                         const x = (centerX / videoElement.videoWidth - 0.5) * 16;
                         const y = -(centerY / videoElement.videoHeight - 0.5) * 12;
 
-                        // Apply per-marker smoothing
                         if (!isPositionInitialized[markerIndex]) {
-                            smoothedPositions[markerIndex].x = x;
-                            smoothedPositions[markerIndex].y = y;
-                            smoothedPositions[markerIndex].z = 0;
+                            smoothedPositions[markerIndex] = { x, y, z: 0 };
                             isPositionInitialized[markerIndex] = true;
                         } else {
-                            const deltaX = x - smoothedPositions[markerIndex].x;
-                            const deltaY = y - smoothedPositions[markerIndex].y;
-                            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-                            
-                            if (distance > MIN_MOVEMENT_THRESHOLD) {
-                                smoothedPositions[markerIndex].x += (x - smoothedPositions[markerIndex].x) * SMOOTHING_FACTOR;
-                                smoothedPositions[markerIndex].y += (y - smoothedPositions[markerIndex].y) * SMOOTHING_FACTOR;
+                            const dx = x - smoothedPositions[markerIndex].x;
+                            const dy = y - smoothedPositions[markerIndex].y;
+                            if (Math.sqrt(dx * dx + dy * dy) > MIN_MOVEMENT_THRESHOLD) {
+                                smoothedPositions[markerIndex].x += dx * SMOOTHING_FACTOR;
+                                smoothedPositions[markerIndex].y += dy * SMOOTHING_FACTOR;
                                 smoothedPositions[markerIndex].z += (0 - smoothedPositions[markerIndex].z) * SMOOTHING_FACTOR;
                             }
                         }
@@ -407,7 +487,6 @@ function detectMarker() {
                 }
             }
 
-            // Hide this marker's model if not detected this frame
             if (!detectedThisMarker) {
                 arObject.visible = false;
                 isPositionInitialized[markerIndex] = false;
@@ -422,10 +501,7 @@ function detectMarker() {
         frameDescriptors.delete();
         frameGray.delete();
         frame.delete();
-        
-        if (canvas.parentNode) {
-            canvas.parentNode.removeChild(canvas);
-        }
+        if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
 
     } catch (error) {
         console.error(" Marker detection error:", {
@@ -439,46 +515,39 @@ function detectMarker() {
 }
 
 async function switch3DObject(index) {
-    // index is 1-based from UI; convert to 0-based
     currentObjectType = index;
     const markerIndex = index - 1;
     await create3DObject(markerIndex);
+    syncScaleUI(markerIndex);
     const names = ['Model 1', 'Model 2', 'Model 3'];
     updateStatus(` Reloaded: ${names[markerIndex]}`);
 }
 
 function stopARScene() {
     trackingActive = false;
+
+    const panel = document.getElementById('scaleControlPanel');
+    if (panel) panel.remove();
     
     if (videoElement && videoElement.srcObject) {
-        const tracks = videoElement.srcObject.getTracks();
-        tracks.forEach(track => track.stop());
-        if (videoElement.parentNode) {
-            videoElement.parentNode.removeChild(videoElement);
-        }
+        videoElement.srcObject.getTracks().forEach(t => t.stop());
+        if (videoElement.parentNode) videoElement.parentNode.removeChild(videoElement);
     }
     
-    if (videoTexture) {
-        videoTexture.dispose();
-    }
+    if (videoTexture) videoTexture.dispose();
     
     if (arRenderer) {
         arRenderer.dispose();
         const canvas = arRenderer.domElement;
-        if (canvas && canvas.parentNode) {
-            canvas.parentNode.removeChild(canvas);
-        }
+        if (canvas && canvas.parentNode) canvas.parentNode.removeChild(canvas);
     }
     
     if (arScene) {
         arScene.traverse(object => {
             if (object.geometry) object.geometry.dispose();
             if (object.material) {
-                if (Array.isArray(object.material)) {
-                    object.material.forEach(mat => mat.dispose());
-                } else {
-                    object.material.dispose();
-                }
+                (Array.isArray(object.material) ? object.material : [object.material])
+                    .forEach(mat => mat.dispose());
             }
         });
     }
@@ -491,6 +560,7 @@ function stopARScene() {
     arObjects = [null, null, null];
     loadedModels = {};
     isPositionInitialized = [false, false, false];
+    modelScales = [60, 60, 60];
     
     console.log(" AR stopped");
     updateStatus(" AR stopped");
